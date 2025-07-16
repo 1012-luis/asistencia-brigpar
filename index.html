@@ -102,6 +102,23 @@
       text-decoration: underline;
     }
 
+    .panel {
+      display: none;
+      margin-top: 20px;
+      text-align: center;
+    }
+
+    .acciones {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin: 20px 0;
+    }
+
+    .acciones button {
+      width: 120px;
+    }
+
     #registroHoras {
       margin: 20px auto;
       width: 90%;
@@ -140,8 +157,6 @@
   </style>
 </head>
 <body>
-
-  <!-- Fondos -->
   <video autoplay muted loop id="videoFondo">
     <source src="fondo.mp4" type="video/mp4">
     Tu navegador no soporta videos HTML5.
@@ -161,81 +176,100 @@
       <input id="passLogin" type="password" placeholder="Contraseña">
       <button onclick="login()">Ingresar</button>
       <p><a href="#" onclick="mostrarRegistro()">¿No tienes cuenta? Regístrate</a></p>
+      <p><a href="#" onclick="recuperarCuenta()">¿Olvidaste tu contraseña?</a></p>
     </dialog>
 
     <!-- Registro -->
     <dialog id="registroDialog">
       <h2>Registro</h2>
       <input id="nuevoUser" placeholder="Nuevo usuario">
+      <input id="nuevoDNI" placeholder="DNI del trabajador">
+      <input type="file" id="registroFoto" accept="image/*">
       <input id="nuevoPass1" type="password" placeholder="Contraseña">
       <input id="nuevoPass2" type="password" placeholder="Repetir contraseña">
       <button onclick="registrar()">Registrar</button>
       <p><a href="#" onclick="volverLogin()">Volver al Login</a></p>
     </dialog>
 
+    <!-- Recuperar contraseña -->
+    <dialog id="recuperarDialog">
+      <h2>Recuperar Contraseña</h2>
+      <input id="dniRecuperar" placeholder="Ingresa tu DNI">
+      <button onclick="verificarDNI()">Ingresar</button>
+      <p><a href="#" onclick="volverLoginDesdeRecuperar()">Volver al Login</a></p>
+    </dialog>
+
     <!-- Panel principal -->
-    <div id="panel" style="display:none; position: relative;">
-      <div style="position: fixed; top: 20px; right: 20px; z-index: 10;">
+    <div class="panel" id="panelPrincipal">
+      <div style="position: relative; text-align: right; padding: 10px 20px;">
         <label for="fileInput">
-          <img id="fotoPerfil" src="https://cdn-icons-png.flaticon.com/512/1144/1144760.png" alt="Perfil">
+          <img id="fotoPerfil" src="https://cdn-icons-png.flaticon.com/512/1144/1144760.png" alt="Foto de perfil">
         </label>
         <input type="file" id="fileInput" accept="image/*" style="display: none;" onchange="cambiarFoto(event)">
       </div>
-
-      <h2 id="bienvenida" style="margin-top: 70px;"></h2>
-      <button onclick="marcar('entrada')">Marcar Entrada</button>
-      <p id="horaEntrada"></p>
-      <button onclick="marcar('salida')">Marcar Salida</button>
-      <p id="horaSalida"></p>
-
+      <h2 id="bienvenida"></h2>
+      <div class="acciones">
+        <button onclick="marcar('entrada')">Entrada</button>
+        <button onclick="marcar('salida')">Salida</button>
+      </div>
       <div id="registroHoras">
         <h3>Historial de Horas</h3>
         <ul id="listaHoras"></ul>
       </div>
-
-      <button onclick="cerrarSesion()" style="background:#660000;">Cerrar Sesión</button>
+      <button onclick="cerrarSesion()" style="background-color: #660000;">Cerrar Sesión</button>
     </div>
   </div>
 
   <script>
-    let usuarios = JSON.parse(localStorage.getItem("usuarios")) || [{ nombre: "admin", clave: "1234" }];
-    let usuarioActivo = localStorage.getItem("usuarioActivo") || "";
+    let usuarios = JSON.parse(localStorage.getItem("usuarios")) || [];
+    let usuarioActivo = null;
 
-    function login() {
-      let u = document.getElementById("userLogin").value;
-      let p = document.getElementById("passLogin").value;
-      let existe = usuarios.find(x => x.nombre === u && x.clave === p);
-      if (existe) {
-        usuarioActivo = u;
-        localStorage.setItem("usuarioActivo", u);
-        document.getElementById("bienvenida").innerText = "Hola " + u;
-        document.getElementById("loginDialog").close();
-        document.getElementById("panel").style.display = "block";
-        cargarFotoPerfil();
+    function registrar() {
+      const usuario = document.getElementById("nuevoUser").value;
+      const dni = document.getElementById("nuevoDNI").value;
+      const pass1 = document.getElementById("nuevoPass1").value;
+      const pass2 = document.getElementById("nuevoPass2").value;
+      const fotoInput = document.getElementById("registroFoto");
+      
+      if (!usuario || !dni || !pass1 || !pass2) return alert("Completa todos los campos");
+      if (pass1 !== pass2) return alert("Las contraseñas no coinciden");
+      if (usuarios.find(u => u.usuario === usuario)) return alert("Ese usuario ya existe");
 
-        document.getElementById("videoFondo").style.display = "none";
-        document.querySelector(".overlayOscura").style.display = "none";
-        document.getElementById("fondoImagen").style.display = "block";
-        document.getElementById("overlayBlanco").style.display = "block";
+      let fotoBase64 = "";
+      if (fotoInput.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          fotoBase64 = e.target.result;
+          usuarios.push({ usuario, clave: pass1, dni, foto: fotoBase64 });
+          localStorage.setItem("usuarios", JSON.stringify(usuarios));
+          alert("Usuario registrado correctamente.");
+          document.getElementById("registroDialog").close();
+          document.getElementById("loginDialog").showModal();
+        };
+        reader.readAsDataURL(fotoInput.files[0]);
       } else {
-        alert("Usuario o contraseña incorrectos");
+        usuarios.push({ usuario, clave: pass1, dni, foto: "" });
+        localStorage.setItem("usuarios", JSON.stringify(usuarios));
+        alert("Usuario registrado sin foto.");
+        document.getElementById("registroDialog").close();
+        document.getElementById("loginDialog").showModal();
       }
     }
 
-    function registrar() {
-      let u = document.getElementById("nuevoUser").value;
-      let p1 = document.getElementById("nuevoPass1").value;
-      let p2 = document.getElementById("nuevoPass2").value;
+    function login() {
+      const u = document.getElementById("userLogin").value;
+      const p = document.getElementById("passLogin").value;
+      const existe = usuarios.find(x => x.usuario === u && x.clave === p);
 
-      if (!u || !p1 || !p2) return alert("Completa todos los campos");
-      if (p1 !== p2) return alert("Las contraseñas no coinciden");
-      if (usuarios.find(x => x.nombre === u)) return alert("Ese usuario ya existe");
-
-      usuarios.push({ nombre: u, clave: p1 });
-      localStorage.setItem("usuarios", JSON.stringify(usuarios));
-      alert("Usuario registrado. Ahora puedes iniciar sesión.");
-      document.getElementById("registroDialog").close();
-      document.getElementById("loginDialog").showModal();
+      if (existe) {
+        usuarioActivo = existe;
+        document.getElementById("bienvenida").innerText = `Hola, ${usuarioActivo.usuario}`;
+        document.getElementById("fotoPerfil").src = usuarioActivo.foto || "https://cdn-icons-png.flaticon.com/512/1144/1144760.png";
+        document.getElementById("loginDialog").close();
+        document.getElementById("panelPrincipal").style.display = "block";
+      } else {
+        alert("Usuario o contraseña incorrectos");
+      }
     }
 
     function mostrarRegistro() {
@@ -248,54 +282,59 @@
       document.getElementById("loginDialog").showModal();
     }
 
+    function recuperarCuenta() {
+      document.getElementById("loginDialog").close();
+      document.getElementById("recuperarDialog").showModal();
+    }
+
+    function volverLoginDesdeRecuperar() {
+      document.getElementById("recuperarDialog").close();
+      document.getElementById("loginDialog").showModal();
+    }
+
+    function verificarDNI() {
+      const dni = document.getElementById("dniRecuperar").value;
+      const usuario = usuarios.find(u => u.dni === dni);
+      if (usuario) {
+        let nuevaClave = prompt("DNI válido. Escribe tu nueva contraseña:");
+        if (nuevaClave) {
+          usuario.clave = nuevaClave;
+          localStorage.setItem("usuarios", JSON.stringify(usuarios));
+          alert("Contraseña actualizada correctamente.");
+          volverLoginDesdeRecuperar();
+        }
+      } else {
+        alert("No se encontró ningún usuario con ese DNI.");
+      }
+    }
+
     function marcar(tipo) {
-      let hora = new Date().toLocaleTimeString();
+      const hora = new Date().toLocaleTimeString();
       const lista = document.getElementById("listaHoras");
       const item = document.createElement("li");
-      if (tipo === "entrada") {
-        document.getElementById("horaEntrada").innerText = "Entrada: " + hora;
-        item.textContent = "Entrada marcada a las " + hora;
-      } else {
-        document.getElementById("horaSalida").innerText = "Salida: " + hora;
-        item.textContent = "Salida marcada a las " + hora;
-      }
+      item.textContent = `${tipo === 'entrada' ? 'Entrada' : 'Salida'} marcada a las ${hora}`;
       lista.appendChild(item);
+    }
+
+    function cerrarSesion() {
+      usuarioActivo = null;
+      document.getElementById("panelPrincipal").style.display = "none";
+      document.getElementById("loginDialog").showModal();
     }
 
     function cambiarFoto(event) {
       const archivo = event.target.files[0];
-      if (archivo) {
-        const lector = new FileReader();
-        lector.onload = function(e) {
-          document.getElementById("fotoPerfil").src = e.target.result;
-          localStorage.setItem("fotoPerfil_" + usuarioActivo, e.target.result);
-        };
-        lector.readAsDataURL(archivo);
-      }
-    }
-
-    function cargarFotoPerfil() {
-      const guardada = localStorage.getItem("fotoPerfil_" + usuarioActivo);
-      if (guardada) {
-        document.getElementById("fotoPerfil").src = guardada;
-      }
-    }
-
-    function cerrarSesion() {
-      localStorage.removeItem("usuarioActivo");
-      location.reload();
-    }
-
-    window.onload = function() {
-      if (usuarioActivo) {
-        const u = usuarios.find(x => x.nombre === usuarioActivo);
-        if (u) {
-          document.getElementById("userLogin").value = u.nombre;
-          document.getElementById("passLogin").value = u.clave;
-          login();
+      if (!archivo) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById("fotoPerfil").src = e.target.result;
+        if (usuarioActivo) {
+          usuarioActivo.foto = e.target.result;
+          localStorage.setItem("usuarios", JSON.stringify(usuarios));
         }
       }
-    };
+      reader.readAsDataURL(archivo);
+    }
   </script>
 </body>
 </html>
